@@ -1,0 +1,5 @@
+build/
+ovmf/
+
+# Scripts should be optional.
+*.sh

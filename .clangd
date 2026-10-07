@@ -1,0 +1,22 @@
+CompileFlags:
+  Add: [-Wall, -Wextra, -ffreestanding]
+---
+If:
+  PathMatch: ["src/boot/.*\\.c", "src/boot/.*\\.h"]
+CompileFlags:
+  Add:
+    [
+      -xc,
+      -target,
+      x86_64-pc-windows-msvc,
+      -isystem,
+      /usr/include/efi,
+      -std=c99,
+      -Wpedantic,
+    ]
+---
+If:
+  PathMatch: [".*\\.h", ".*\\.cpp"]
+  PathExclude: src/boot/.*
+CompileFlags:
+  Add: [-xc++, -target, x86_64-unknown-none-elf]
