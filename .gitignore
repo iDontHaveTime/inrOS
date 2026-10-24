@@ -1,5 +1,8 @@
 build/
 ovmf/
 
+.zed/
+.vscode/
+
 # Scripts should be optional.
 *.sh

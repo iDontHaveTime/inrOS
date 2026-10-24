@@ -4,5 +4,6 @@
 #include "bootdef.h"
 
 VOID* EFIAPI memcpy(VOID* restrict dest, const VOID* restrict src, size_t n);
+VOID* EFIAPI memset(VOID* dest, int c, size_t n);
 
 #endif // BOOT_BOOTSTR_H

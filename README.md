@@ -6,7 +6,7 @@ This is a hobby kernel project with a custom UEFI bootloader, currently the only
 
 ## Status
 
-Currently this project only boots into the bootloader, there is no kernel or anything yet.
+Currently the bootloader can map the kernel and jump into it.
 
 ## Booting
 
@@ -14,6 +14,7 @@ Since this project is (currently) x86-64 UEFI only, and it does not utilize thir
 ```
 /dev/sda:
  - EFI/BOOT/BOOTX64.EFI
+ - inr-kernel
 ```
 The example above may and probably is not accurate to your machine, it is mainly there to show how the drive should look like inside, not tell you what drive to use.
 
