@@ -11,7 +11,7 @@ CompileFlags:
       x86_64-pc-windows-msvc,
       -isystem,
       /usr/include/efi,
-      -std=c99,
+      -std=c11,
       -Wpedantic,
     ]
 ---
