@@ -31,6 +31,8 @@ typedef struct {
     uint16_t eshstrndx;
 } Elf64Header;
 
+_Static_assert(sizeof(Elf64Header) == 64, "ELF64 Header isn't 64 bytes");
+
 typedef struct {
     uint32_t ptype;
     uint32_t pflags;
@@ -42,28 +44,31 @@ typedef struct {
     uint64_t palign;
 } Elf64ProgramHeader;
 
+_Static_assert(sizeof(Elf64ProgramHeader) == 56,
+               "ELF64 Program header isn't 56 bytes");
+
 int EFIAPI verifyElfHeaderForx86_64boot(const char* image);
 
 #ifdef __attribute__
 #undef __attribute__ // For some reason the uefi headers define it?
 #endif
 
-typedef void(__attribute__((sysv_abi, noreturn)) * kernel_start)(kernel_data*);
+typedef void(__attribute__((sysv_abi, noreturn)) * kernel_start)(boot_info*);
 
-void EFIAPI fbToKernelDataStruct(framebuffer_info* fb, kernel_data* kd);
+void EFIAPI fbToKernelDataStruct(const framebuffer_info* fb, kernel_data* kd);
+void EFIAPI mmToKernelDataStruct(const memorymap_info* mm, kernel_data* kd);
 
 typedef struct {
     char *start, *end;
     char* stack;
     char *imageStart, *imageEnd;
-    char* extraStorage; // For example storing the kernel data struct.
+    boot_info* bootInfo;
     kernel_start entryPoint;
 } LoadedELF64Image;
 
 int EFIAPI loadElf64Image(const char* image, LoadedELF64Image* info);
 
 __attribute__((noreturn)) void jumpIntoElf64Image(kernel_start entry,
-                                                  kernel_data* data,
-                                                  char* stack);
+                                                  boot_info* data, char* stack);
 
 #endif // BOOT_BOOTELF_H

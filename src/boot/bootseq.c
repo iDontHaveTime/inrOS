@@ -1,5 +1,6 @@
 #include "bootseq.h"
 
+#include "bootdef.h"
 #include "bootio.h"
 
 EFI_GRAPHICS_OUTPUT_PROTOCOL* EFIAPI getGOP(void) {
@@ -40,35 +41,34 @@ VOID EFIAPI fillFBwithGOPinfo(framebuffer_info* fb,
 EFI_STATUS EFIAPI getMemoryMap(memorymap_info* mm) {
     mm->memoryMapSize = 0;
     mm->memoryMap = NULL;
+    EFI_STATUS status;
 
-    EFI_STATUS mapStatus = SystemTable->BootServices->GetMemoryMap(
+    status = SystemTable->BootServices->GetMemoryMap(
         &mm->memoryMapSize, mm->memoryMap, &mm->memoryMapKey,
         &mm->memoryMapDescSize, &mm->memoryMapDescVersion);
-
-    if(mapStatus != EFI_BUFFER_TOO_SMALL) {
+    if(status != EFI_BUFFER_TOO_SMALL) {
         println(
             L"[ERROR] Memory map did not return a status of "
             L"EFI_BUFFER_TOO_SMALL");
-        return mapStatus;
+        return status;
     }
 
-    mm->memoryMapSize += 2 * mm->memoryMapDescSize;
-    mapStatus = SystemTable->BootServices->AllocatePool(
+    status = SystemTable->BootServices->AllocatePool(
         EfiLoaderData, mm->memoryMapSize, (void**)&mm->memoryMap);
-    if(mapStatus != EFI_SUCCESS) {
+    if(status != EFI_SUCCESS) {
         println(L"[ERROR] Failed to allocate a memory map");
-        return mapStatus;
+        return status;
     }
 
-    mapStatus = SystemTable->BootServices->GetMemoryMap(
+    status = SystemTable->BootServices->GetMemoryMap(
         &mm->memoryMapSize, mm->memoryMap, &mm->memoryMapKey,
         &mm->memoryMapDescSize, &mm->memoryMapDescVersion);
 
-    if(mapStatus != EFI_SUCCESS) {
+    if(status != EFI_SUCCESS) {
         SystemTable->BootServices->FreePool(mm->memoryMap);
         println(L"[ERROR] Failed to get the memory map");
-        return mapStatus;
+        return status;
     }
 
-    return mapStatus;
+    return status;
 }

@@ -4,7 +4,7 @@
 CC ::= clang
 CXX ::= $(CC)++
 
-CFLAGS ::= -Wall -Wextra -ffreestanding -nostdlib -std=c99
+CFLAGS ::= -Wall -Wextra -ffreestanding -nostdlib -std=c11
 CXXFLAGS ::= -Wall -Wextra -ffreestanding -nostdlib -std=c++20 -fno-exceptions -fno-rtti
 
 # Build related stuff.
@@ -24,9 +24,10 @@ BOOT_CFLAGS ::= -target x86_64-pc-windows-msvc -fuse-ld=lld-link -mno-stack-arg-
 
 KERNEL_TARGET ::= $(BOOT_ROOT)/inr-kernel
 
-KERNEL_SOURCES ::= src/kernel/main.cpp
+KERNEL_SOURCES ::= src/kernel/main.cpp src/kernel/graphics/uefi/gop.cpp src/kernel/memory/paging.cpp\
+				   src/kernel/kernel.cpp
 
-KERNEL_CXXFLAGS ::= -target x86_64-unknown-none-elf -mno-red-zone
+KERNEL_CXXFLAGS ::= -target x86_64-unknown-none-elf -mno-red-zone -Wl,-T,src/kernel/kernel_script.ld -mcmodel=small
 
 all: $(KERNEL_TARGET)
 
@@ -51,5 +52,4 @@ $(BUILD_FOLDER):
 
 # Misc rules.
 clean:
-	rm -rf $(BOOT_ROOT)
 	rm -rf $(BUILD_FOLDER)

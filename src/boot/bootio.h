@@ -15,7 +15,7 @@ VOID EFIAPI printh64(uint64_t i);
 
 #ifndef NDEBUG
 static inline VOID EFIAPI _print_verbose(CHAR16* str) {
-    print(L"[VERBOSE]: ");
+    print(L"[VERBOSE] ");
     println(str);
 }
 #define verbose(str) _print_verbose(str)

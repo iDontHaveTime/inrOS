@@ -1,56 +1,27 @@
-#include <stdint.h>
-
 #include "../kernel_info.h"
+#include "graphics/gdriver.h"
+#include "kernel.h"
+#include "memory/paging.h"
 
-static inline uint32_t getpixel(uint8_t r, uint8_t g, uint8_t b,
-                                uefi_pixel_format format) {
-    switch(format) {
-        case UEFI_PixelRedGreenBlueReserved8BitPerColor:
-            return (uint32_t)r | ((uint32_t)g << 8) | ((uint32_t)b << 16);
-            break;
-        case UEFI_PixelBlueGreenRedReserved8BitPerColor:
-            return (uint32_t)b | ((uint32_t)g << 8) | ((uint32_t)r << 16);
-            break;
-        default:
-            return 0;
-    }
+extern "C" void vm_kernel_start(boot_info* data) {
+    GraphicsDriver graphics(data);
+
+    panic_graphics(graphics);
 }
 
-[[gnu::used]]
-static inline void putpixel(unsigned x, unsigned y, uint8_t r, uint8_t g,
-                            uint8_t b, kernel_data::uefi_fb& fb) {
-    *((uint32_t*)(fb.framebufferAddress + 4 * fb.pixelsPerScanLine * y +
-                  4 * x)) = getpixel(r, g, b, fb.pixelFormat);
-}
-
-static inline void fillpixel(unsigned x, unsigned y, unsigned w, unsigned h,
-                             uint8_t r, uint8_t g, uint8_t b,
-                             kernel_data::uefi_fb& fb) {
-    uint32_t pixel = getpixel(r, g, b, fb.pixelFormat);
-
-    for(unsigned i = 0; i < w; i++) {
-        for(unsigned j = 0; j < h; j++) {
-            *((uint32_t*)(fb.framebufferAddress +
-                          4 * fb.pixelsPerScanLine * (y + j) + 4 * (x + i))) =
-                pixel;
-        }
-    }
-}
-
-void panic_quiet() {
-    asm volatile("cli");
-    while(1) {
-        asm volatile("hlt");
-    }
-}
-
-extern "C" void _start(kernel_data* data) {
+/// When this function is called the processor should be in this state (similar,
+/// if not the same as UEFI specifies): Long mode, Paging enabled and identity
+/// mapped, Direction in EFLAGS is cleared, FP cw is 0x037F, Interrupts are
+/// enabled, although none are supported, CR0.EM and CR0.TS are zero.
+extern "C" int /* Use int so the compiler can warn if there's no return (or halt
+                  in this case) */
+_start(boot_info* data) {
     if(!data) panic_quiet();
 
-    if(data->ufb.framebufferAddress) {
-        fillpixel(0, 0, data->ufb.horizontalRes, data->ufb.verticalRes, 0, 0, 0,
-                  data->ufb);
-    }
+    GraphicsDriver graphics(data);
 
-    panic_quiet();
+    graphics.fillPixels(0, 0, graphics.getHorizontalRes(),
+                        graphics.getVerticalRes(), 0, 0, 0);
+
+    paging::jump_into_vm_kernel(data);
 }
