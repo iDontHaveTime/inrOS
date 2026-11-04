@@ -25,7 +25,7 @@ BOOT_CFLAGS ::= -target x86_64-pc-windows-msvc -fuse-ld=lld-link -mno-stack-arg-
 KERNEL_TARGET ::= $(BOOT_ROOT)/inr-kernel
 
 KERNEL_SOURCES ::= src/kernel/main.cpp src/kernel/graphics/uefi/gop.cpp src/kernel/memory/paging.cpp\
-				   src/kernel/kernel.cpp
+				   src/kernel/kernel.cpp src/kernel/graphics/sbmtext.cpp src/kernel/std/string.cpp
 
 KERNEL_CXXFLAGS ::= -target x86_64-unknown-none-elf -mno-red-zone -Wl,-T,src/kernel/kernel_script.ld -mcmodel=small
 

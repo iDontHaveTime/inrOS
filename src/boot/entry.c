@@ -19,6 +19,7 @@ EFI_STATUS EFIAPI _start(EFI_HANDLE imgHandleArg_,
     EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = getGOP();
     framebuffer_info fb;
     if(!gop) {
+        fb.framebufferAddress = 0;
         println(L"[WARNING] GOP was not found");
     }
     else {
