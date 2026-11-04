@@ -6,7 +6,7 @@ This is a hobby kernel project with a custom UEFI bootloader, currently the only
 
 ## Status
 
-Currently the bootloader can map the kernel and jump into it.
+Currently the bootloader can map the kernel and jump into it, then from there the kernel can map itself into higher half.
 
 ## Booting
 
