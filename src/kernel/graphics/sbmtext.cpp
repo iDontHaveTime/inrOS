@@ -1,6 +1,5 @@
 #include "sbmtext.h"
 
-#include "../pic.h"
 #include "font/ascii.cpp"
 #include "gdriver.h"
 
@@ -29,10 +28,7 @@ SBMText& SBMText::put(char c) {
             c = '?';
         }
 
-        const unsigned char* fontPtr;
-        pic_get_symbol_rip_relative(font8x8_basic, fontPtr);
-
-        const unsigned char* fontline = fontPtr + ((unsigned char)c * 8);
+        const unsigned char* fontline = font8x8_basic[(unsigned char)c];
 
         unsigned x = charColumn_ * 8;
         unsigned y = charLine_ * 8;

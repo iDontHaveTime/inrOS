@@ -75,7 +75,7 @@ int verifyElfHeaderForx86_64boot(const char* image) {
 #define PF_W 0x2
 #define PF_R 0x4
 
-#define STACK_SIZE 4
+#define STACK_SIZE 6
 #define BOOT_INFO_SIZE ((sizeof(boot_info) + 4095) / 4096)
 
 static inline UINTN getStackSize(void) {
@@ -134,6 +134,7 @@ static inline void fillELF64Pages(const char* image, LoadedELF64Image* info) {
         (const Elf64ProgramHeader*)(image + header->ephoff);
 
     uintptr_t maxVaddr = 0;
+    uintptr_t minVaddr = -1;
 
     char* pageStart = info->imageStart;
     for(uint16_t i = 0; i < header->ephnum; i++) {
@@ -145,6 +146,8 @@ static inline void fillELF64Pages(const char* image, LoadedELF64Image* info) {
         maxVaddr = ((phdr[i].pvaddr + (pageCount * EFI_PAGE_SIZE)) > maxVaddr)
                        ? phdr[i].pvaddr + (pageCount * EFI_PAGE_SIZE)
                        : maxVaddr;
+
+        minVaddr = ((phdr[i].pvaddr < minVaddr) ? phdr[i].pvaddr : minVaddr);
 
         mapping_info* mi = info->bootInfo->maps + info->bootInfo->mapCount++;
         mi->paddr = (uintptr_t)pageStart;
@@ -186,6 +189,10 @@ static inline void fillELF64Pages(const char* image, LoadedELF64Image* info) {
 
     info->bootInfo->stackAndBootInfoVaddr =
         maxVaddr + (getStackSize() * EFI_PAGE_SIZE);
+
+    info->bootInfo->maxVaddr =
+        maxVaddr + ((getStackSize() + getBootInfoSize()) * EFI_PAGE_SIZE);
+    info->bootInfo->minVaddr = minVaddr;
 }
 
 // 0xFFFFFFFF80000000
@@ -225,11 +232,8 @@ void EFIAPI fbToKernelDataStruct(const framebuffer_info* fb, kernel_data* kd) {
         case PixelBitMask:
             kd->ufb.pixelFormat = UEFI_PixelBitMask;
             break;
-        case PixelBltOnly:
+        default:
             kd->ufb.pixelFormat = UEFI_PixelBltOnly;
-            break;
-        case PixelFormatMax:
-            kd->ufb.pixelFormat = UEFI_PixelFormatMax;
             break;
     }
 }

@@ -39,6 +39,10 @@ public:
         }
     }
 
+    void clearscreen(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0) {
+        fillPixels(0, 0, getHorizontalRes(), getVerticalRes(), r, g, b);
+    }
+
     bool bootedFromUEFI() const {
         return bootInfo_->bootedFrom == boot_info::BootSource_UEFI;
     }

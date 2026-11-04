@@ -8,7 +8,6 @@ enum uefi_pixel_format {
     UEFI_PixelBlueGreenRedReserved8BitPerColor,
     UEFI_PixelBitMask,
     UEFI_PixelBltOnly,
-    UEFI_PixelFormatMax,
 };
 
 typedef struct {
@@ -48,6 +47,8 @@ typedef struct {
         BootSource_UEFI,
     } bootedFrom;
     uintptr_t stackAndBootInfoVaddr;
+    uintptr_t minVaddr;
+    uintptr_t maxVaddr;
 } boot_info;
 
 #endif // SRC_KERNEL_INFO_H
