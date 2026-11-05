@@ -10,6 +10,8 @@ enum uefi_pixel_format {
     UEFI_PixelBltOnly,
 };
 
+#define KMAP_FLAG_AVAILABLE 0x1
+
 typedef struct {
     struct uefi_fb {
         char* framebufferAddress;
@@ -17,13 +19,23 @@ typedef struct {
         uint32_t horizontalRes, verticalRes, pixelsPerScanLine;
         enum uefi_pixel_format pixelFormat;
     } ufb;
-    struct uefi_mm {
-        uintptr_t memoryMapSize;
-        void* memoryMap;
-        uint64_t memoryMapKey;
-        uintptr_t memoryMapDescSize;
-        uint32_t memoryMapDescVersion;
-    } umm;
+    union {
+        struct {
+            uintptr_t memoryMapSize;
+            void* memoryMap;
+            uint64_t memoryMapKey;
+            uintptr_t memoryMapDescSize;
+            uint32_t memoryMapDescVersion;
+        } umm; // UEFI memory map.
+        struct {
+            uint64_t mapEntries;
+            struct {
+                uintptr_t paddr;
+                uint64_t pageCount;
+                unsigned flags;
+            }* memoryMap;
+        } kmm; // Kernel memory map. (post UEFI)
+    };
 } kernel_data;
 
 #define MAPPING_INFO_EXEC 0x1

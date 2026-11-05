@@ -63,6 +63,33 @@ public:
     SBMText& operator<<(unsigned char) = delete;
 
     template<typename T>
+    SBMText& printHex(T) = delete;
+
+    template<>
+    SBMText& printHex(unsigned char);
+
+    template<>
+    SBMText& printHex(unsigned short);
+
+    template<>
+    SBMText& printHex(unsigned);
+
+    template<>
+    SBMText& printHex(unsigned long);
+
+    template<>
+    SBMText& printHex(unsigned long long);
+
+    template<>
+    SBMText& printHex(const void* ptr) {
+        return printHex(uintptr_t(ptr));
+    }
+
+    SBMText& operator<<(const void* ptr) {
+        return printHex(ptr);
+    }
+
+    template<typename T>
     requires(traits::is_integer<T>::value)
     SBMText& operator<<(T n) {
         char buffer[integer_description<T>::max_decimal_digits + 5];

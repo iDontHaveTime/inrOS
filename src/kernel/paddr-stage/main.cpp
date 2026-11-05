@@ -5,8 +5,13 @@
 #include "../std/bitmap.h"
 #include "../std/string.h"
 
+using kernel_map_t = decltype(boot_info::kd.kmm.memoryMap);
+
 #define pic_get_symbol_rip_relative(symbolName, variable) \
     asm("leaq " #symbolName "(%%rip), %0\n" : "=r"(variable))
+
+#define pic_mov64_symbol_rip_relative(symbolName, variable) \
+    asm("movq %0, " #symbolName "(%%rip)\n" ::"r"(variable))
 
 static inline void wrmsr(uint64_t msr, uint64_t value) {
     uint32_t low = value & 0xFFFFFFFF;
@@ -56,6 +61,8 @@ static inline uint64_t rdmsr(uint64_t msr) {
 
 extern "C" {
 alignas(0x1000) uint64_t kernel_page_tables[512];
+char* bitmap_address;
+size_t bitmap_byte_count;
 }
 
 struct uefi_map_entry {
@@ -135,14 +142,13 @@ struct uefi_map_wrapper {
 #define PAGE_PML4_MASK 0xFF8000000000
 
 static inline uint64_t* allocate_page(boot_info* data, kbitmap& bitmap) {
-    for(const uefi_map_entry* entry : uefi_map_wrapper(data)) {
-        if(entry->alwaysUsableMemory()) {
-            size_t bit = entry->paddr / 4096;
-            for(uint64_t i = 0; i < entry->pageCount; i++) {
-                if(!bitmap.getBit(bit + i)) {
-                    bitmap.setBit(bit + i, true);
-                    return (uint64_t*)(entry->paddr + (i * 0x1000));
-                }
+    for(size_t entryIdx = 0; entryIdx < data->kd.kmm.mapEntries; entryIdx++) {
+        const auto& entry = data->kd.kmm.memoryMap[entryIdx];
+        size_t bit = entry.paddr / 4096;
+        for(uint64_t i = 0; i < entry.pageCount; i++) {
+            if(!bitmap.getBit(bit + i)) {
+                bitmap.setBit(bit + i, true);
+                return (uint64_t*)(entry.paddr + (i * 0x1000));
             }
         }
     }
@@ -275,6 +281,8 @@ static inline void addBitmapToMapping(boot_info* data, char* bitmapPaddr,
 
     data->minVaddr -= pageAllocCount * 0x1000;
     bitmapMap->vaddr = data->minVaddr;
+
+    pic_mov64_symbol_rip_relative(bitmap_address, bitmapMap->vaddr);
 }
 
 static inline void addFramebufferToMapping(boot_info* data) {
@@ -291,6 +299,92 @@ static inline void addFramebufferToMapping(boot_info* data) {
 
         data->kd.ufb.framebufferAddress = (char*)fbMap->vaddr;
     }
+}
+
+static inline void mark_unallocated_pages(boot_info* data, kbitmap& memmap) {
+    for(const uefi_map_entry* entry : uefi_map_wrapper(data)) {
+        if(entry->alwaysUsableMemory()) {
+            size_t bit = entry->paddr / 4096;
+            for(uint64_t i = 0; i < entry->pageCount; i++) {
+                memmap.setBit(bit + i, false);
+            }
+        }
+    }
+}
+
+static inline void mark_bitmap_pages(size_t pageAllocCount, char* bitmapPaddr,
+                                     kbitmap& memmap) {
+    for(size_t i = 0; i < pageAllocCount; i++) {
+        memmap.setBit((uintptr_t(bitmapPaddr) / 4096) + i, true);
+    }
+}
+
+static inline uint64_t create_kernel_mmap(boot_info* data, kbitmap& memmap) {
+    size_t entriesNeeded = 0;
+    for(const uefi_map_entry* entry : uefi_map_wrapper(data)) {
+        if(entry->alwaysUsableMemory()) entriesNeeded++;
+    }
+
+    void* mapAddr = nullptr;
+
+    size_t pagesNeeded =
+        ((entriesNeeded * sizeof(*data->kd.kmm.memoryMap)) + 4095) / 4096;
+    for(const uefi_map_entry* entry : uefi_map_wrapper(data)) {
+        if(entry->alwaysUsableMemory() && entry->pageCount >= pagesNeeded) {
+            size_t bit = entry->paddr / 4096;
+            for(uint64_t i = 0; i < entry->pageCount; i++) {
+                if(!memmap.getBit(bit + i)) {
+                    bool candidate = true;
+                    for(uint64_t j = 1; j < pagesNeeded; j++) {
+                        if(j >= entry->pageCount ||
+                           memmap.getBit(bit + i + j)) {
+                            candidate = false;
+                            i = j;
+                            break;
+                        }
+                    }
+                    if(!candidate) continue;
+
+                    uint64_t addr = entry->paddr + (i * 0x1000);
+
+                    memmap.setNBits(bit + i, pagesNeeded, true);
+
+                    mapAddr = (void*)addr;
+                }
+            }
+        }
+        if(mapAddr) break;
+    }
+
+    if(!mapAddr) {
+        try_halt_graphics(data);
+    }
+
+    mapping_info* mapmap = &data->maps[data->mapCount++];
+    mapmap->paddr = uintptr_t(mapAddr);
+    mapmap->pageCount = pagesNeeded;
+    mapmap->permissions = MAPPING_INFO_WRITE | MAPPING_INFO_READ;
+
+    data->minVaddr -= pagesNeeded * 0x1000;
+    mapmap->vaddr = data->minVaddr;
+
+    kernel_map_t kMemoryMap = (kernel_map_t)mapAddr;
+
+    size_t index = 0;
+    for(const uefi_map_entry* entry : uefi_map_wrapper(data)) {
+        if(entry->alwaysUsableMemory()) {
+            kernel_map_t ke = kMemoryMap + index;
+            ke->flags = KMAP_FLAG_AVAILABLE;
+            ke->paddr = entry->paddr;
+            ke->pageCount = entry->pageCount;
+
+            index++;
+        }
+    }
+
+    data->kd.kmm.memoryMap = kMemoryMap;
+    data->kd.kmm.mapEntries = entriesNeeded;
+    return mapmap->vaddr;
 }
 
 /// When this function is called the processor should be in this state (similar,
@@ -314,7 +408,7 @@ extern "C" [[noreturn]] void _start(boot_info* data) {
         try_halt_graphics(data);
     }
 
-    if(data->mapCount + 1 +
+    if(data->mapCount + 2 +
            unsigned(data->bootedFrom == boot_info::BootSource_UEFI &&
                     data->kd.ufb.framebufferAddress) >=
        MAPPING_INFO_COUNT) {
@@ -322,23 +416,15 @@ extern "C" [[noreturn]] void _start(boot_info* data) {
     }
 
     addBitmapToMapping(data, bitmapPaddr, pageAllocCount);
+    pic_mov64_symbol_rip_relative(bitmap_byte_count, byteCount);
     addFramebufferToMapping(data);
 
     kbitmap memmap(bitmapPaddr, byteCount);
     memmap.setAllBits(true);
 
-    for(const uefi_map_entry* entry : uefi_map_wrapper(data)) {
-        if(entry->alwaysUsableMemory()) {
-            size_t bit = entry->paddr / 4096;
-            for(uint64_t i = 0; i < entry->pageCount; i++) {
-                memmap.setBit(bit + i, false);
-            }
-        }
-    }
-
-    for(size_t i = 0; i < pageAllocCount; i++) {
-        memmap.setBit((uintptr_t(bitmapPaddr) / 4096) + i, true);
-    }
+    mark_unallocated_pages(data, memmap);
+    mark_bitmap_pages(pageAllocCount, bitmapPaddr, memmap);
+    auto kmapVaddr = create_kernel_mmap(data, memmap);
 
     uint64_t* kernelTable;
     pic_get_symbol_rip_relative(kernel_page_tables, kernelTable);
@@ -346,5 +432,6 @@ extern "C" [[noreturn]] void _start(boot_info* data) {
     memset(kernelTable, 0, sizeof(kernel_page_tables));
 
     map_mapping_to_page_table(data, memmap, kernelTable);
+    data->kd.kmm.memoryMap = (kernel_map_t)kmapVaddr;
     transfer_to_vm_start(data->stackAndBootInfoVaddr, kernelTable);
 }

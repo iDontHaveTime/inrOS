@@ -65,6 +65,12 @@ public:
 
         return -1;
     }
+
+    void setNBits(size_t bigBegin, size_t n, bool b) {
+        for(size_t i = 0; i < n; i++) {
+            setBit(bigBegin + i, b);
+        }
+    }
 };
 
 #endif // STD_BITMAP_H

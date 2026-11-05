@@ -1,3 +1,4 @@
+#define NDEBUG
 #include <efi.h>
 
 #include "bootdef.h"
